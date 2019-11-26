@@ -1,0 +1,315 @@
+% Autor: Dominik Harmim <harmim6@gmail.com>
+
+\documentclass[a4paper, 10pt, twocolumn]{article}
+
+\usepackage[czech]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[left=2cm, top=2cm, text={17cm, 25cm}]{geometry}
+\usepackage[unicode, colorlinks, hypertexnames=false, citecolor=red]{hyperref}
+\usepackage{times}
+\usepackage{graphicx}
+
+\renewcommand{\tt}[1]{\texttt{\textbf{#1}}}
+
+
+\begin{document}
+	\twocolumn[
+		\begin{@twocolumnfalse}
+			\begin{center}
+				{\Large
+					Vysoké učení technické v~Brně \\
+					Fakulta informačních technologií \\
+				}
+				{\includegraphics[width=.4 \linewidth]{img/FIT_logo.pdf}} \\
+
+				{\LARGE
+					Bezpečnost informačních systémů \\
+					Projekt\,--\,The FITfather \\[.4cm]
+				}
+
+				{\large
+					Dominik Harmim (xharmi00) \\
+					\texttt{xharmi00@stud.fit.vutbr.cz} \\
+					\today
+				}
+			\end{center}
+		\end{@twocolumnfalse}
+	]
+
+
+	\section{Úvod}
+
+	Cílem tohoto projektu je získat co nejvíce tajemství ukrytých
+	na privátních serverech ve vnitřní síti \tt{bis.fit.vutbr.cz}.
+	Následující kapitoly popisují zmapování vnitřní sítě a~postup
+	získání jednotlivých tajemství.
+
+
+	\section{Zmapování sítě}
+
+	Po přihlášení na server \tt{bis.fit.vutbr.cz} bylo příkazem
+	\tt{ifconfig} zjištěno, že se počítač nachází v~síti
+	192.168.122.0/24. Příkazem \tt{nmap -p- 192.168.122.0/24}
+	byly nalezeny následující počíteče a~jejich otevřené porty:
+	\begin{itemize}
+		\item
+			192.168.122.38
+			\begin{itemize}
+				\item 21/tcp ftp
+				\item 22/tcp ssh
+				\item 80/tcp http
+			\end{itemize}
+
+		\item
+			192.168.122.42
+			\begin{itemize}
+				\item 22/tcp ssh
+				\item 111/tcp rpcbind
+			\end{itemize}
+
+		\item
+			192.168.122.77
+			\begin{itemize}
+				\item 22/tcp ssh
+				\item 111/tcp rpcbind
+			\end{itemize}
+
+		\item
+			192.168.122.83
+			\begin{itemize}
+				\item 22/tcp ssh
+				\item 111/tcp rpcbind
+			\end{itemize}
+
+		\item
+			192.168.122.105
+			\begin{itemize}
+				\item 22/tcp ssh
+				\item 80/tcp http
+				\item 111/tcp rpcbind
+				\item 3306/tcp mysql
+			\end{itemize}
+
+		\item
+			192.168.122.150
+			\begin{itemize}
+				\item 22/tcp ssh
+				\item 111/tcp rpcbind
+			\end{itemize}
+
+		\item
+			192.168.122.155
+			\begin{itemize}
+				\item 22/tcp ssh
+				\item 111/tcp rpcbind
+			\end{itemize}
+
+		\item
+			192.168.122.169
+			\begin{itemize}
+				\item 22/tcp ssh
+				\item 80/tcp http
+				\item 111/tcp rpcbind
+				\item 42424/tcp unknown
+			\end{itemize}
+
+		\item
+			192.168.122.206
+			\begin{itemize}
+				\item 22/tcp ssh
+				\item 111/tcp rpcbind
+			\end{itemize}
+
+		\item
+			192.168.122.215
+			\begin{itemize}
+				\item 22/tcp ssh
+				\item 111/tcp rpcbind
+			\end{itemize}
+
+		\item
+			192.168.122.220
+			\begin{itemize}
+				\item 22/tcp ssh
+				\item 23/tcp telnet
+				\item 80/tcp http
+			\end{itemize}
+
+		\item
+			192.168.122.227
+			\begin{itemize}
+				\item 22/tcp ssh
+				\item 111/tcp rpcbind
+			\end{itemize}
+	\end{itemize}
+
+
+	\section{Získání tajemství}
+
+	Tato kapitola popisuje postup získání jednotlivých tajemství.
+
+	\subsection{Tajemství~A}
+
+	Na počítači 192.168.122.38 běží HTTP server na portu 80. Při
+	přístupu přes prohlížeč \tt{elinks} příkazem \tt{elinks
+	http://192.168.122.38/} bylo zjištěno, že na serveru běží
+	webová aplikace pro zadávání a~vyhledávání zaměstnanců určité
+	firmy, která pravděpodobně používá nějakou SQL databázi. Je
+	možné zkusit  \textit{SQL injection} vložením řetězce
+	\tt{"foo foo;} do vyhledávacího pole. Zobrazí se SQL chybové
+	hlášení, ze kterého lze zjistit, že se jedná o~SQL server
+	MariaDB a~provádí se dotaz \tt{SELECT id, name, email, address
+	FROM contact WHERE name LIKE "\%"foo foo;\%}. Je možné tohoto
+	využít pomocí příkazu \tt{UNION} a~do uvedených databázových
+	sloupců, které se zobrazují v~aplikaci, je možné vytáhnout
+	požadovaná data. Zadáním \tt{" UNION SELECT 42, `table\_name`,
+	'foo', 'foo' FROM `information\_schema`.`tables` WHERE
+	`table\_type` = 'BASE TABLE';\#} do vyhledávacího pole je
+	získán seznam všech definovaných databázových tabulek.
+	V~tabulce s~názvem \tt{auth} by mohly být uložené nějaké
+	přihlašovací údaje. Názvy sloupců této tabulky lze získat
+	zadáním \tt{" UNION SELECT 42, `column\_name`, 'foo',
+	'foo' FROM `information\_schema`.`columns` WHERE `table\_name`
+	= 'auth';\#} do vyhledávacího pole. Bylo zjištěno, že tato
+	tabulka obsahuje sloupce \tt{id}, \tt{login} a~\tt{passwd}.
+	Vypsání sloupců \tt{login} a~\tt{passwd} je možné zadáním
+	\tt{" UNION SELECT 42, `login`, `passwd`, 'foo' FROM
+	`auth`;\#} do vyhledávacího pole. V~poli \tt{passwd} u~sloupce,
+	kde má pole \tt{login} hodnotu \tt{admin}, se nachází
+	tajemství~\textbf{A}.
+
+	\subsection{Tajemství~B}
+
+	Na serveru 192.168.122.169 běží na portu 42424 neznámá služba.
+	Pokusem o~připojení na tento port přes protokol FTP bylo zjištěno,
+	že na tomto portu běží FTP server. Po připojení příkazem
+	\tt{ftp 192.168.122.169 42424} byly vyžadovány přihlašovací
+	údaje. Bylo vyzkoušeno, že je možné se autentizovat jako
+	anonymní uživatel s~přihlašovacím jménem \tt{anonymous}
+	a~s~prázdným heslem. Na FTP serveru se nachází soubor
+	\tt{/secret.txt}. Po jeho stažení příkazem \tt{get /secret.txt}
+	a~vypsání příkazem \tt{cat \textasciitilde/secret.txt} bylo
+	získáno tajemství~\textbf{B}.
+
+	\subsection{Tajemství~C}
+
+	Na počítači 192.168.122.169 běží HTTP server na portu 80.
+	Při přístupu přes prohlížeč \tt{elinks} příkazem \tt{elinks
+	http://192.168.122.169/} bylo zjištěno, že lze prohledávat
+	dostupné adresáře. Pří přístupu k~souboru
+	\tt{http://192.168.122.169/etc/raddb/\\sql.conf} bylo získáno
+	tajemství~\textbf{C}.
+
+	\subsection{Tajemství~D}
+	\label{sec:secG}
+
+	Na počítači 192.168.122.220 běží SSH server na portu 22. Při
+	pokusu o~připojení na tento server přes protokol SSH příkazem
+	\tt{ssh 192.168.122.220} byl vypsán řetězec \tt{Hello, smith!}
+	a~byly vyžadovány přihlašovací údaje. Při přihlášení jako uživatel
+	s~přihlašovacím jménem \tt{smith} příkazem \tt{ssh
+	smith@192.168.122.220} už nebylo heslo vyžadováno. Příkazem
+	\tt{tcpdump -i ens3 -w out.pcap} byl vygenerován záznam síťové
+	komunikace na rozhraní s~názvem \tt{ens3}, který byl zjištěn
+	příkazem \tt{ifconfig}. Síťová komunikace byla zaznamenávána
+	pouze po určitou dobu, poté byl zaznamenaný výstup uložen do
+	souboru. Tento soubor byl následně analyzován v~programu Wireshark.
+	Protože na tomto serveru běží služba TELNET na portu 23, tak byla
+	analýza zaměřená na pakety právě protokolu TELNET. Při zobrazení
+	TCP toku těchto paketů bylo vidět, že se zasílá přihlašovací
+	jméno \tt{ada} a~heslo \tt{nachystejteuzenace} v~čisté podobě.
+	Při přihlášení na server 192.168.122.220 přes protokol TELNET
+	příkazem \tt{telnet 192.168.122.220} s~přihlašovacím jménem
+	\tt{ada} a~heslem \tt{nachystejteuzenace} byl na tomto serveru
+	nalezen soubor \tt{\textasciitilde/secret.txt}. Po je ho vypsání
+	příkazem \tt{cat \textasciitilde/secret.txt} bylo nalezeno
+	tajemství~\textbf{D}.
+
+	\subsection{Tajemství~E}
+
+	Na počítači 192.168.122.220 běží HTTP server na portu 80. Při
+	přístupu přes prohlížeč \tt{elinks} příkazem \tt{elinks
+	http://192.168.122.220/} byl zobrazen přihlašovací formulář, kde
+	bylo vyžadováno jméno a~heslo. Příkazem \tt{curl -v
+	http://192.168.122.220/} bylo zjištěno, že pro kontrolu přihlášení
+	se používá cookie s~názvem \tt{LOGGED\_IN}, které je nastaveno na
+	hodnotu \tt{False}. Byl proveden HTTP dotaz na tento server
+	s~nastavením tohoto cookie na hodnotu \tt{True} příkazem \tt{curl
+	-\,-cookie 'LOGGED\_IN=True' http://192.168.122.220/}. Tímto bylo
+	získáno tajemství~\textbf{E}.
+
+	\subsection{Tajemství~F}
+
+	Na počítači 192.168.122.227 běží SSH sever na portu 22. Při pokusu
+	o~připojení na tento server přes protokol SSH příkazem \tt{ssh
+	192.168.122.227} byla zobrazena hláška, která říká, že je možné
+	přihlásit se jako uživatel \tt{teacher} a~byly vyžadovány
+	přístupové údaje. Bylo zjištěno, že je možné se přihlásit jako
+	uživatel \tt{teacher} s~heslem \tt{teacher} příkazem \tt{ssh
+	teacher@192.168.122.227}. Bylo zjištěno, že na tomto serveru
+	je možné využít zranitelnosti příkazu \tt{sudo}, kde při zadání
+	příkazu s~prefixem \tt{sudo -u\#-1} není vyžadováno heslo správce,
+	ale heslo aktuálně přihlášeného uživatele. Proto bylo vyzkoušeno
+	na celém serveru vyhledat soubory, které ve svém názvu obsahují
+	podřetězec \tt{secret} příkazem \tt{sudo -u\#-1 find / -name
+	*secret*}. Byl nalezen soubor \tt{/root/secret.txt}. Vypsáním
+	tohoto souboru příkazem \tt{sudo -u\#-1 cat /root/secret.txt}
+	bylo získáno tajemství~\textbf{F}.
+
+	\subsection{Tajemství~G}
+
+	Na serveru 192.168.122.38 běží FTP server na portu 21. Při pokusu
+	o~připojení na tento server přes protokol FTP příkazem \tt{ftp
+	192.168.122.38} byly vyžadovány přístupové údaje. Tímto bylo
+	také zjištěno, že se jedná o~FTP server verze \tt{vsFTPd 2.3.4},
+	který obsahuje takovou zranitelnost, že při přihlášení
+	s~uživatelským jménem, které obsahuje podřetězec \tt{:)}, lze
+	zadat prázdné heslo. Při pokusu o~přihlášení stejným příkazem, se
+	zadáním uživatelského jména \tt{foo:)} a~prázdného hesla, se
+	pouze zobrazí, že je otevřen port 53244. Při přihlášení na
+	tento server přes protokol FTP na port 53244 příkazem \tt{ftp
+	192.168.122.38 53244} bylo získáno tajemství~\textbf{G}.
+
+	\subsection{Tajemství~H}
+
+	Na serveru 192.168.122.220 (připojení viz tajemství~D,
+	kapitola~\ref{sec:secG}) byly vyhledávány v~dostupných adresářích
+	soubory, které ve svém názvu obsahují podřetězec \tt{secret}. Příkazem
+	\tt{ls /usr/bin/ | grep secret} byl nalezen spustitelný soubor
+	\tt{/usr/bin/show-secret}. Spuštěním tohoto souboru příkazem
+	\tt{/usr/bin/show-secret} bylo získáno tajemství~\textbf{H}.
+
+	\subsection{Tajemství~I}
+
+	Na počítači 192.168.122.105 běží HTTP server na portu 80. Při
+	přístupu přes prohlížeč \tt{elinks} příkazem \tt{elinks
+	http://192.168.122.105/} bylo zjištěno, že na serveru existuje
+	adresář \tt{www}. Při následném přístupu do tohoto adresáře
+	příkazem \tt{elinks http://192.168.122.105/www/} se zobrazuje
+	chybová hláška s~kódem 500. Jedná se o~klasické chybové hlášení
+	\textit{PHP frameworku Nette}. Zdrojové kódy aplikací napsaných
+	v~tomto frameworku jsou typicky uloženy o~úroveň výše v~adresáři
+	\tt{app}. Proto byl vyzkoušen přístup do tohoto adresáře příkazem
+	\tt{elinks http://192.168.122.105/app/}. Zde je možné procházet
+	adresářovou strukturu. Prohledáváním jednotlivých souborů bylo
+	v~souboru \tt{http://192.168.122.105/app/config/\\local.neon} jako
+	heslo k~databázi nalezeno tajemství~\textbf{I}.
+
+	\subsection{Tajemství~J}
+
+	Na počítači 192.168.122.77 běží SSH server na portu 22. Při pokusu
+	o~připojení na tento server přes protokol SSH příkazem \tt{ssh
+	192.168.122.77} byly vyžadovány přístupové údaje. Bylo vyzkoušeno,
+	že je možné přihlásit se jako uživatel \tt{root} s~heslem \tt{root}
+	příkazem \tt{ssh root@192.168.122.77}. Na tomto serveru byl
+	nalezen soubor \tt{\textasciitilde/secret.txt}. Jeho vypsáním 
+	příkazem \tt{cat \textasciitilde/secret.txt} bylo získáno
+	tajemství~\textbf{J}.
+
+
+	\section{Závěr}
+
+	Všech 10 tajemství (A-F) bylo úspěšně nalezeno, jak je popsáno
+	v~kapitolách výše.
+\end{document}
